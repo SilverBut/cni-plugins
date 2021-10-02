@@ -18,7 +18,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/containernetworking/cni/pkg/types"
@@ -32,6 +34,25 @@ var optionNameToID = map[string]dhcp4.OptionCode{
 	"host-name":               dhcp4.OptionHostName,
 	"user-class":              dhcp4.OptionUserClass,
 	"vendor-class-identifier": dhcp4.OptionVendorClassIdentifier,
+	"domain-name-servers":     dhcp4.OptionDomainNameServer,
+	"domain-name":             dhcp4.OptionDomainName,
+}
+
+func parseDNSServers(opts dhcp4.Options) []string {
+	// Parse DNS from dhcp4 options packet
+	// ns = 4 bytes, net.IP
+	nameservers := []string{}
+	var ns string
+	if opt, ok := opts[dhcp4.OptionDomainNameServer]; ok {
+		for len(opt) >= 4 {
+			ns = net.IP(opt[0:4]).String()
+			nameservers = append(nameservers, ns)
+			opt = opt[4:]
+		}
+
+	}
+
+	return nameservers
 }
 
 func parseOptionName(option string) (dhcp4.OptionCode, error) {
@@ -59,6 +80,28 @@ func classfulSubnet(sn net.IP) net.IPNet {
 		IP:   sn,
 		Mask: sn.DefaultMask(),
 	}
+}
+
+func parseDNSDomain(opts dhcp4.Options) string {
+	// Parse domainname option
+	var domainname string
+	// Max 63 bytes per label, must start with a letter or digit
+	var DNSName string = `^([a-zA-Z0-9_-]{1,63}){1}(\.[a-zA-Z0-9_-]{1,63})*$`
+	if opt, ok := opts[dhcp4.OptionDomainName]; ok {
+		domainname = string(opt[:])
+		// RFC 1035 section 2.3.4 and 3.1
+		if len(strings.Replace(domainname, ".", "", -1)) > 255 {
+			// length is restricted to 255 octects
+			return ""
+		}
+		// labels max 63 bytes
+		matched, _ := regexp.MatchString(DNSName, domainname)
+		if !matched {
+			return ""
+		}
+	}
+
+	return domainname
 }
 
 func parseRoutes(opts dhcp4.Options) []*types.Route {

@@ -69,8 +69,10 @@ type DHCPLease struct {
 }
 
 var requestOptionsDefault = map[dhcp4.OptionCode]bool{
-	dhcp4.OptionRouter:     true,
-	dhcp4.OptionSubnetMask: true,
+	dhcp4.OptionRouter:           true,
+	dhcp4.OptionSubnetMask:       true,
+	dhcp4.OptionDomainName:       true,
+	dhcp4.OptionDomainNameServer: true,
 }
 
 func prepareOptions(cniArgs string, ProvideOptions []ProvideOption, RequestOptions []RequestOption) (
@@ -417,6 +419,15 @@ func (l *DHCPLease) Routes() []*types.Route {
 	}
 
 	return routes
+}
+
+func (l *DHCPLease) DNSServers() []string {
+	// parse and return DNS Server included in the options section
+	return parseDNSServers(l.opts)
+}
+
+func (l *DHCPLease) DNSDomain() string {
+	return parseDNSDomain(l.opts)
 }
 
 // jitter returns a random value within [-span, span) range

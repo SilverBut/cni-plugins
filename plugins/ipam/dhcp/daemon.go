@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/coreos/go-systemd/v22/activation"
 )
@@ -98,6 +99,11 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 		Gateway: l.Gateway(),
 	}}
 	result.Routes = l.Routes()
+
+	result.DNS = types.DNS{
+		Nameservers: l.DNSServers(),
+		Domain:      l.DNSDomain(),
+	}
 
 	return nil
 }
